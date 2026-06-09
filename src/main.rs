@@ -3,17 +3,31 @@ mod application;
 mod domain;
 mod infrastructure;
 
-use domain::rate_limit::RateLimitResult;
-use domain::token_bucket::TokenBucket;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-use crate::domain::rate_limiter::RateLimiter;
+use application::rate_limiter_service::RateLimiterService;
 
 fn main() {
-   let mut limiter = TokenBucket::new(5, 1);
+  let service = Arc::new(Mutex::new(RateLimiterService::new(5,1)));
 
-   for i in 1..=10 {
-       let result = limiter.check();
+  let mut handles = Vec::new();
+  
+  for i in 0..10 {
+      let service_clone = Arc::clone(&service);
 
-       println!("Request {} -> allowed={}, remaining={}", i, result.allowed, result.remaining);
-   }
+      let handle = thread::spawn(move || {
+          let mut service = service_clone.lock().unwrap();
+
+          let result = service.check("user:123");
+
+          println!("Thread {} -> allowed={}, remaining={}", i, result.allowed, result.remaining);
+      });
+
+      handles.push(handle);
+  }
+
+  for handle in handles {
+      handle.join().unwrap();
+  }
 }
