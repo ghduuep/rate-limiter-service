@@ -3,31 +3,45 @@ mod application;
 mod domain;
 mod infrastructure;
 
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::sync::{Arc};
 
 use application::rate_limiter_service::RateLimiterService;
+use domain::rate_limit_policy::RateLimitPolicy;
+use domain::rate_limit_request::RateLimitRequest;
 
-fn main() {
-  let service = Arc::new(Mutex::new(RateLimiterService::new(5,1)));
+#[tokio::main] async fn main() {
+    let policy = RateLimitPolicy {
+        capacity: 5.0,
+        refill_rate: 1.0,
+    };
 
-  let mut handles = Vec::new();
-  
-  for i in 0..10 {
-      let service_clone = Arc::clone(&service);
+    let service = Arc::new(RateLimiterService::new());
 
-      let handle = thread::spawn(move || {
-          let mut service = service_clone.lock().unwrap();
+    let mut handles = Vec::new();
 
-          let result = service.check("user:123");
+    for i in 0..10 {
+        let service_clone = Arc::clone(&service);
+        let policy = policy.clone();
 
-          println!("Thread {} -> allowed={}, remaining={}", i, result.allowed, result.remaining);
-      });
+        let handle = tokio::spawn(async move {
 
-      handles.push(handle);
-  }
+            let request = RateLimitRequest {
+                key: "user:123".to_string(),
+                cost: 1,
+            };
 
-  for handle in handles {
-      handle.join().unwrap();
-  }
+            let result = service_clone.check(&request, &policy);
+
+            println!(
+                "Thread {} -> allowed={}, remaining={}",
+                i, result.allowed, result.remaining
+            );
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
 }

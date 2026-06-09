@@ -1,4 +1,5 @@
+#[derive(Clone)]
 pub struct RateLimitPolicy {
-    pub capacity: u64,
-    pub refill_rate: u64,
+    pub capacity: f64,
+    pub refill_rate: f64,
 }
