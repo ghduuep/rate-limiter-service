@@ -1,5 +1,5 @@
 #[derive(Debug)]
 pub struct RateLimitRequest {
     pub key: String,
-    pub cost: u64,
+    pub cost: f64,
 }
